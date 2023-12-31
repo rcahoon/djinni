@@ -143,6 +143,7 @@ class JNIMarshal(spec: Spec) extends Marshal(spec) {
   def helperName(tm: MExpr): String = tm.base match {
     case d: MDef => withNs(Some(spec.jniNamespace), helperClass(d.name))
     case e: MExtern => e.jni.translator
+    case tp: MParam => helperClass(tp.name)
     case o => withNs(Some("djinni"), o match {
       case p: MPrimitive => p.idlName match {
         case "i8" => "I8"
@@ -164,7 +165,7 @@ class JNIMarshal(spec: Spec) extends Marshal(spec) {
       case MArray => "Array"
       case d: MDef => throw new AssertionError("unreachable")
       case e: MExtern => throw new AssertionError("unreachable")
-      case p: MParam => throw new AssertionError("not applicable")
+      case p: MParam => throw new AssertionError("unreachable")
       case MVoid => "Void"
     })
   }

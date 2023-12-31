@@ -83,7 +83,8 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       case r: Record =>
         if (d.name != exclude) {
           if (forwardDeclareOnly) {
-            List(DeclRef(s"struct ${typename(d.name, d.body)};", Some(spec.cppNamespace)))
+            val typeParams = if (d.numParams == 0) "" else "template " + List.fill(d.numParams)("typename").mkString("<", ", ", ">") + " "
+            List(DeclRef(s"${typeParams}struct ${typename(d.name, d.body)};", Some(spec.cppNamespace)))
           } else {
             List(ImportRef(include(d.name, r.ext.cpp)))
           }
@@ -103,7 +104,8 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
         }
       case i: Interface =>
         val base = if (d.name != exclude) {
-          List(ImportRef("<memory>"), DeclRef(s"class ${typename(d.name, d.body)};", Some(spec.cppNamespace)))
+          val typeParams = if (d.numParams == 0) "" else "template " + List.fill(d.numParams)("typename").mkString("<", ", ", ">") + " "
+          List(ImportRef("<memory>"), DeclRef(s"${typeParams}class ${typename(d.name, d.body)};", Some(spec.cppNamespace)))
         } else {
           List(ImportRef("<memory>"))
         }
@@ -176,24 +178,24 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       }
       withNs(ns, name)
     }
-    def base(m: Meta): String = m match {
+    def base(m: Meta, args: String): String = m match {
       case p: MPrimitive => p.cName
       case MString => if (spec.cppUseWideStrings) "std::wstring" else "std::string"
       case MDate => "std::chrono::system_clock::time_point"
       case MBinary => "std::vector<uint8_t>"
-      case MOptional => spec.cppOptionalTemplate
-      case MList | MArray => "std::vector"
-      case MSet => "std::unordered_set"
-      case MMap => "std::unordered_map"
+      case MOptional => spec.cppOptionalTemplate + args
+      case MList | MArray => "std::vector" + args
+      case MSet => "std::unordered_set" + args
+      case MMap => "std::unordered_map" + args
       case d: MDef =>
         d.defType match {
           case DEnum => withNamespace(idCpp.enumType(d.name))
-          case DRecord => withNamespace(idCpp.ty(d.name))
-          case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}>"
+          case DRecord => withNamespace(idCpp.ty(d.name)) + args
+          case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}${args}>"
         }
       case e: MExtern => e.defType match {
-        case DInterface => s"std::shared_ptr<${e.cpp.typename}>"
-        case _ => e.cpp.typename
+        case DInterface => s"std::shared_ptr<${e.cpp.typename}${args}>"
+        case _ => e.cpp.typename + args
       }
       case p: MParam => idCpp.typeParam(p.name)
       case p: MProtobuf => withNs(Some(p.body.cpp.ns), p.name)
@@ -208,19 +210,19 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
           tm.base match {
             case d: MDef =>
               d.defType match {
-                case DInterface => s"${nnType}<${withNamespace(idCpp.ty(d.name))}>"
-                case _ => base(tm.base) + args
+                case DInterface => s"${nnType}<${withNamespace(idCpp.ty(d.name))}${args}>"
+                case _ => base(tm.base, args)
               }
             case MOptional =>
               tm.args.head.base match {
                 case d: MDef =>
                   d.defType match {
-                    case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}>"
-                    case _ => base(tm.base) + args
+                    case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}${args}>"
+                    case _ => base(tm.base, args)
                   }
-                case _ => base(tm.base) + args
+                case _ => base(tm.base, args)
               }
-            case _ => base(tm.base) + args
+            case _ => base(tm.base, args)
           }
         }
         case None =>
@@ -228,7 +230,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
           val prefix = if (!isInterface(ty)) {""} else { /* isInterface */
             if (isOptional(tm)) {"/*nullable*/ "} else {"/*not-null*/ "}}
           val args = if (ty.args.isEmpty) "" else ty.args.map(expr).mkString("<", ", ", ">")
-          prefix + base(ty.base) + args
+          prefix + base(ty.base, args)
       }
     }
     expr(tm)

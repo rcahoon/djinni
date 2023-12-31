@@ -33,6 +33,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//support-lib:djinni-support-common",
+        "@bazel_tools//tools/jdk:jni",
     ],
     alwayslink = 1,
 )

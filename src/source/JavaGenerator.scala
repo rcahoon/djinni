@@ -216,7 +216,7 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
             nullityAnnotation + marshal.paramType(p.ty) + " " + idJava.local(p.ident)
           })
           marshal.nullityAnnotation(m.ret).foreach(w.wl)
-          w.wl("public static native " + ret + " " + idJava.method(m.ident) + params.mkString("(", ", ", ")") + ";")
+          w.wl("public static native " + typeParamList + " " + ret + " " + idJava.method(m.ident) + params.mkString("(", ", ", ")") + ";")
         }
         if (i.ext.cpp) {
           w.wl

@@ -516,5 +516,5 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
   }
 
   def cppTypeArgs(params: Seq[TypeParam]): String =
-    if (params.isEmpty) "" else params.map(p => idCpp.typeParam(p.ident)).mkString("<", ", ", ">")
+    if (params.isEmpty) "" else params.map(p => "typename " + spec.jniClassIdentStyle(p.ident) + "::CppType").mkString("<", ", ", ">")
 }
