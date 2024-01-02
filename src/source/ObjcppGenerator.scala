@@ -103,14 +103,8 @@ class ObjcppGenerator(spec: Spec) extends BaseObjcGenerator(spec) {
       wrapNamespace(w, spec.objcppNamespace, w => {
         w.wl(s"class $helperClass").bracedSemi {
           w.wlOutdent("public:")
-          spec.cppNnType match {
-            case Some(nnPtr) =>
-              w.wl(s"using CppType = ${nnPtr}<$cppSelf>;")
-              w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
-            case _ =>
-              w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
-              w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
-          }
+          w.wl(s"using CppType = ::djinni::SharedPtr<$cppSelf>;")
+          w.wl(s"using CppOptType = ::djinni::SharedPtr<$cppSelf>;")
           w.wl("using ObjcType = " + (if(useProtocol(i.ext, spec)) s"id<$self>" else s"$self*") + ";");
           w.wl
           w.wl(s"using Boxed = $helperClass;")
@@ -165,15 +159,15 @@ class ObjcppGenerator(spec: Spec) extends BaseObjcGenerator(spec) {
         else
           w.wl(s"@interface $objcSelf ()")
         w.wl
-        w.wl(s"- (id)initWithCpp:(const std::shared_ptr<$cppSelf>&)cppRef;")
+        w.wl(s"- (id)initWithCpp:(const ::djinni::SharedPtr<$cppSelf>&)cppRef;")
         w.wl
         w.wl("@end")
         w.wl
         w.wl(s"@implementation $objcSelf {")
-        w.wl(s"    ::djinni::CppProxyCache::Handle<std::shared_ptr<$cppSelf>> _cppRefHandle;")
+        w.wl(s"    ::djinni::CppProxyCache::Handle<::djinni::SharedPtr<$cppSelf>> _cppRefHandle;")
         w.wl("}")
         w.wl
-        w.wl(s"- (id)initWithCpp:(const std::shared_ptr<$cppSelf>&)cppRef")
+        w.wl(s"- (id)initWithCpp:(const ::djinni::SharedPtr<$cppSelf>&)cppRef")
         w.braced {
           w.w("if (self = [super init])").braced {
             w.wl("_cppRefHandle.assign(cppRef);")
@@ -335,6 +329,11 @@ class ObjcppGenerator(spec: Spec) extends BaseObjcGenerator(spec) {
         w.wl("@end")
       }
     })
+  }
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    if (l.interface.isEmpty) {
+      generateInterface(origin, ident, doc, typeParams, implToInterface(l))
+    }
   }
 
   override def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record) {

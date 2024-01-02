@@ -201,6 +201,9 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
 
     val jniSelf = jniMarshal.helperClass(ident)
     val cppSelf = cppMarshal.fqTypename(ident, i) + cppTypeArgs(typeParams)
+    //FIXME: Add a method to `CppMarshal` that canonically produces the name of the
+    // binding class (correctly handling the addition of namespaces).
+    val cppBinding = cppMarshal.fqTypename(ident, i) + "_djinni_binding" + cppTypeArgs(typeParams)
 
     val classLookup = jniMarshal.undecoratedTypename(ident, i)
     val baseType = s"::djinni::JniInterface<$cppSelf, $jniSelf>"
@@ -209,14 +212,8 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
       writeJniTypeParams(w, typeParams)
       w.w(s"class $jniSelf final : $baseType").bracedSemi {
         w.wlOutdent(s"public:")
-        spec.cppNnType match {
-          case Some(nnPtr) =>
-            w.wl(s"using CppType = ${nnPtr}<$cppSelf>;")
-            w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
-          case _ =>
-            w.wl(s"using CppType = std::shared_ptr<$cppSelf>;")
-            w.wl(s"using CppOptType = std::shared_ptr<$cppSelf>;")
-        }
+        w.wl(s"using CppType = ::djinni::SharedPtr<$cppSelf>;")
+        w.wl(s"using CppOptType = ::djinni::SharedPtr<$cppSelf>;")
         w.wl(s"using JniType = jobject;")
         w.wl
         w.wl(s"using Boxed = $jniSelf;")
@@ -396,7 +393,8 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
             })
             val methodName = idCpp.method(m.ident)
             val ret = m.ret.fold("")(r => "auto r = ")
-            val call = if (m.static) s"$cppSelf::$methodName(" else s"ref->$methodName("
+            //FIXME: val call = if (m.static) s"$cppSelf::$methodName(" else s"ref->$methodName("
+            val call = s"$cppBinding::$methodName(" + (if (m.static) "" else ("ref" + (if (m.params.isEmpty) "" else ", ")))
             writeAlignedCall(w, ret + call, m.params, ")", p => jniMarshal.toCpp(p.ty, "j_" + idJava.local(p.ident)))
             w.wl(";")
             m.ret.fold()(r => w.wl(s"return ::djinni::release(${jniMarshal.fromCpp(r, cppMarshal.maybeMove("r", r))});"))
@@ -446,6 +444,12 @@ class JNIGenerator(spec: Spec) extends Generator(spec) {
     }
 
     writeJniFiles(origin, typeParams.nonEmpty, ident, refs, writeJniPrototype, writeJniBody)
+  }
+
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    if (l.interface.isEmpty) {
+      generateInterface(origin, ident, doc, typeParams, implToInterface(l))
+    }
   }
 
   override def generateModule(decls: Seq[InternTypeDecl]): Unit = {

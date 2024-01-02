@@ -218,6 +218,11 @@ class TsGenerator(spec: Spec) extends Generator(spec) {
       }
     }
   }
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    if (l.interface.isEmpty) {
+      generateInterface(origin, ident, doc, typeParams, implToInterface(l))
+    }
+  }
   private def withWasmNamespace(name: String, sep: String = "_") = spec.wasmNamespace match {
     case Some(p) => p.replaceAll(Pattern.quote("."), Matcher.quoteReplacement(sep)) + sep + name
     case None => name

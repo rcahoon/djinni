@@ -277,8 +277,8 @@ struct JavaIdentityEquals;
 struct JavaProxyCacheTraits {
     using UnowningImplPointer = jobject;
     using OwningImplPointer = jobject;
-    using OwningProxyPointer = std::shared_ptr<void>;
-    using WeakProxyPointer = std::weak_ptr<void>;
+    using OwningProxyPointer = ::djinni::SharedPtr<void>;
+    using WeakProxyPointer = ::djinni::WeakPtr<void>;
     using UnowningImplPointerHash = JavaIdentityHash;
     using UnowningImplPointerEqual = JavaIdentityEquals;
 };
@@ -312,7 +312,7 @@ template <typename T> using JavaProxyHandle = JavaProxyCache::Handle<GlobalRef<j
 class JavaWeakRef;
 struct JniCppProxyCacheTraits {
     using UnowningImplPointer = void *;
-    using OwningImplPointer = std::shared_ptr<void>;
+    using OwningImplPointer = ::djinni::SharedPtr<void>;
     using OwningProxyPointer = jobject;
     using WeakProxyPointer = JavaWeakRef;
     using UnowningImplPointerHash = std::hash<void *>;
@@ -320,10 +320,10 @@ struct JniCppProxyCacheTraits {
 };
 extern template class ProxyCache<JniCppProxyCacheTraits>;
 using JniCppProxyCache = ProxyCache<JniCppProxyCacheTraits>;
-template <class T> using CppProxyHandle = JniCppProxyCache::Handle<std::shared_ptr<T>>;
+template <class T> using CppProxyHandle = JniCppProxyCache::Handle<::djinni::SharedPtr<T>>;
 
 template <class T>
-static const std::shared_ptr<T> & objectFromHandleAddress(jlong handle) {
+static const ::djinni::SharedPtr<T> & objectFromHandleAddress(jlong handle) {
     assert(handle);
     assert(static_cast<uintptr_t>(handle) > 4096);
     // Below line segfaults gcc-4.8. Using a temporary variable hides the bug.
@@ -373,7 +373,7 @@ public:
      * 3. The provided C++ object has an existing CppProxy (Java-side proxy for C++ impl)
      * 4. The provided C++ object needs a new CppProxy allocated
      */
-    jobject _toJava(JNIEnv* jniEnv, const std::shared_ptr<I> & c) const {
+    jobject _toJava(JNIEnv* jniEnv, const ::djinni::SharedPtr<I> & c) const {
         // Case 1 - null
         if (!c) {
             return nullptr;
@@ -397,7 +397,7 @@ public:
      * 3. The provided Java object has an existing JavaProxy (C++-side proxy for a Java impl)
      * 4. The provided Java object needs a new JavaProxy allocated
      */
-    std::shared_ptr<I> _fromJava(JNIEnv* jniEnv, jobject j) const {
+    ::djinni::SharedPtr<I> _fromJava(JNIEnv* jniEnv, jobject j) const {
         // Case 1 - null
         if (!j) {
             return nullptr;
@@ -430,7 +430,7 @@ private:
      * only exists if the code generator emitted one (if Self::JavaProxy exists).
      */
     template <typename S, typename JavaProxy = typename S::JavaProxy>
-    jobject _unwrapJavaProxy(const std::shared_ptr<I> * c) const {
+    jobject _unwrapJavaProxy(const ::djinni::SharedPtr<I> * c) const {
         if (auto proxy = dynamic_cast<JavaProxy *>(c->get())) {
             return proxy->JavaProxyHandle<JavaProxy>::get().get();
         } else {
@@ -448,11 +448,11 @@ private:
      * it. This is actually called by jniCppProxyCacheGet, which holds a lock on the global
      * C++-to-Java proxy map object.
      */
-    static std::pair<jobject, void*> newCppProxy(const std::shared_ptr<void> & cppObj) {
+    static std::pair<jobject, void*> newCppProxy(const ::djinni::SharedPtr<void> & cppObj) {
         const auto & data = JniClass<Self>::get();
         const auto & jniEnv = jniGetThreadEnv();
         std::unique_ptr<CppProxyHandle<I>> to_encapsulate(
-                new CppProxyHandle<I>(std::static_pointer_cast<I>(cppObj)));
+                new CppProxyHandle<I>(static_pointer_cast<I>(cppObj)));
         jlong handle = static_cast<jlong>(reinterpret_cast<uintptr_t>(to_encapsulate.get()));
         jobject cppProxy = jniEnv->NewObject(data.m_cppProxyClass.clazz.get(),
                                              data.m_cppProxyClass.constructor,
@@ -467,21 +467,21 @@ private:
      * emitted one (if Self::JavaProxy exists).
      */
     template <typename S, typename JavaProxy = typename S::JavaProxy>
-    std::shared_ptr<I> _getJavaProxy(jobject j) const {
+    ::djinni::SharedPtr<I> _getJavaProxy(jobject j) const {
         static_assert(std::is_base_of<JavaProxyHandle<JavaProxy>, JavaProxy>::value,
             "JavaProxy must derive from JavaProxyCacheEntry");
 
-        return std::static_pointer_cast<JavaProxy>(JavaProxyCache::get(
+        return static_pointer_cast<JavaProxy>(JavaProxyCache::get(
             typeid(JavaProxy), j,
-            [] (const jobject & obj) -> std::pair<std::shared_ptr<void>, jobject> {
-                auto ret = std::make_shared<JavaProxy>(obj);
+            [] (const jobject & obj) -> std::pair<::djinni::SharedPtr<void>, jobject> {
+                auto ret = djinni::makeShared<JavaProxy>(obj);
                 return { ret, ret->JavaProxyHandle<JavaProxy>::get().get() };
             }
         ));
     }
 
     template <typename S>
-    std::shared_ptr<I> _getJavaProxy(...) const {
+    ::djinni::SharedPtr<I> _getJavaProxy(...) const {
         assert(false);
         return nullptr;
     }

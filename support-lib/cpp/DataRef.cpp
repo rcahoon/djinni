@@ -22,20 +22,21 @@
 
 namespace djinni {
 
+template <typename Storage>
 class DataRefCpp : public DataRef::Impl {
 public:
     explicit DataRefCpp(size_t len) : _storage(len) {}
     DataRefCpp(const DataRefCpp&) = delete;
-    explicit DataRefCpp(std::vector<uint8_t>&& vec) : _storage(std::move(vec)) {}
+    explicit DataRefCpp(Storage&& vec) : _storage(std::move(vec)) {}
 
     const uint8_t* buf() const override {
-        return _storage.data();
+        return reinterpret_cast<const uint8_t*>(_storage.data());
     }
     size_t len() const override {
         return _storage.size();
     }
     uint8_t* mutableBuf() override {
-        return _storage.data();
+        return reinterpret_cast<uint8_t*>(_storage.data());
     }
 
     PlatformObject platformObj() const override {
@@ -43,23 +44,25 @@ public:
     }
 
 private:
-    std::vector<uint8_t> _storage;
+    Storage _storage;
 };
 
 DataRef::DataRef(size_t len) {
-    _impl = std::make_shared<DataRefCpp>(len);
+    _impl = std::make_shared<DataRefCpp<std::vector<uint8_t>>>(len);
 }
 
 DataRef::DataRef(const void* data, size_t len) {
-    _impl = std::make_shared<DataRefCpp>(len);
+    _impl = std::make_shared<DataRefCpp<std::vector<uint8_t>>>(len);
     memcpy(mutableBuf(), data, len);
 }
 
 DataRef::DataRef(std::vector<uint8_t>&& vec) {
-    _impl = std::make_shared<DataRefCpp>(std::move(vec));
+    _impl = std::make_shared<DataRefCpp<std::vector<uint8_t>>>(std::move(vec));
 }
 
-DataRef::DataRef(std::string&& str) : DataRef(str.data(), str.size()) {}
+DataRef::DataRef(std::string&& str) {
+    _impl = std::make_shared<DataRefCpp<std::string>>(std::move(str));
+}
 
 } // namespace djinni
 

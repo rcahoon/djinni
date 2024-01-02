@@ -8,10 +8,12 @@ sort_order = enum {
     random;
 }
 
-sort_items = interface +c {
+sort_items = impl `textsort::SortItemsImpl` @ "sort_items_impl.hpp" {
     # For the iOS / Android demo
     sort(order: sort_order, items: item_list);
-    static create_with_listener(listener: textbox_listener): sort_items;
+    static create_with_listener(listener: textbox_listener): sort_items `
+        return std::make_shared<textsort::SortItemsImpl>(listener);
+    `;
 
     # For the localhost / command-line demo
     static run_sort(items: item_list): item_list;

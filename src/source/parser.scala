@@ -45,7 +45,7 @@ private object IdlParser extends RegexParsers {
   def flag(): Parser[String] = "@flag" ~> ("\"" ~> """([^"\\]|\\[\\"])*""".r <~ "\"") ^^ { _.replaceAll("""\\(.)""", "$1") }
 
   def importFileRef(): Parser[FileRef] = {
-    ("@" ~> directive) ~ ("\"" ~> filePath <~ "\"") ^^ {
+    ("@" ~> directive) ~ filePath ^^ {
       case "import" ~ x => {
         new IdlFileRef(importFile(x))
       }
@@ -74,7 +74,7 @@ private object IdlParser extends RegexParsers {
     return file.get
   }
 
-  def filePath = "[^\"]*".r
+  def filePath: Parser[String] = ("\"" ~> "[^\"]*".r <~ "\"")
 
   def directive = importDirective | externDirective | protobufDirective
   def importDirective = "import".r
@@ -119,7 +119,7 @@ private object IdlParser extends RegexParsers {
     success(Ext(foundJava, foundCpp, foundObjc, foundJavascript))
   }
 
-  def typeDef: Parser[TypeDef] = record | enum | flags | interface
+  def typeDef: Parser[TypeDef] = record | enum | flags | interface | impl
 
   def recordHeader = "record" ~> extRecord
   def record: Parser[Record] = recordHeader ~ bracesList(field | const) ~ opt(deriving) ^^ {
@@ -172,6 +172,31 @@ private object IdlParser extends RegexParsers {
       Interface(ext, methods, consts)
     }
   }
+
+  def impl: Parser[Impl] = pos("impl") ~ opt(typeRef <~ "with") ~ opt(nativeTypeRef) ~ (bracesList(implMethod) | success(Seq.empty)) ^^ {
+    case (_, loc)~interfaceRef~nativeDelegate~methods => {
+      //if (interfaceRef.isEmpty && methods.isEmpty) throw syntax.Error(loc, "Impl has an empty interface").toException
+      //if (nativeDelegate.isEmpty && methods.isEmpty) throw syntax.Error(loc, "Impl does not have an implementation").toException
+      Impl(interfaceRef, nativeDelegate.getOrElse(NativeTypeRef.EmptyType), methods)
+    }
+  }
+  def nativeTypeRef: Parser[NativeTypeRef] = codeSegment ~ "@" ~ filePath ^^ {
+    case typeName~_~fileName => NativeTypeRef(typeName, fileName)
+  }
+  def implMethod: Parser[Impl.Method] = method ~ opt(returnValuePolicy) ~ rep(keepAlive) ~ opt(codeSegment) ^^ {
+    case m~rvp~ka~code => Impl.Method(m, rvp.getOrElse(ReturnValuePolicy.Automatic), ka, code)
+  }
+  def keepAlive: Parser[KeepAlive] = "keep_alive(" ~ intValue ~ "," ~ intValue ~ ")" ^^ {
+    case _~nurse~_~patient~_ => KeepAlive(nurse, patient)
+  }
+  def returnValuePolicy: Parser[ReturnValuePolicy] = (
+    ("take_return_value" ^^^ ReturnValuePolicy.Take) |
+    ("copy_return_value" ^^^ ReturnValuePolicy.Copy) |
+    ("move_return_value" ^^^ ReturnValuePolicy.Move) |
+    ("ref_return_value" ^^^ ReturnValuePolicy.Disconnect) |
+    ("discard_return_value" ^^^ ReturnValuePolicy.Discard)
+  )
+  def codeSegment: Parser[String] = "`" ~> "[^`]*".r <~ "`"
 
   def externTypeDecl: Parser[TypeDef] = externEnum | externFlags | externInterface | externRecord
   def externEnum: Parser[Enum] = enumHeader ^^ { case _ => Enum(List(), false) }

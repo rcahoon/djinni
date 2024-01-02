@@ -70,11 +70,13 @@ class JavaMarshal(spec: Spec) extends Marshal(spec) {
           case DInterface => interfaceNullityAnnotation
           case DEnum => javaNonnullAnnotation
           case DRecord => javaNonnullAnnotation
+          case DImpl => interfaceNullityAnnotation
         }
       case e: MExtern => e.defType match {
         case DInterface => interfaceNullityAnnotation
         case DRecord => if(e.java.reference) javaNonnullAnnotation else None
         case DEnum => javaNonnullAnnotation
+        case DImpl => throw new AssertionError("unimplemented")
       }
       case _ => javaNonnullAnnotation
     }
@@ -85,6 +87,7 @@ class JavaMarshal(spec: Spec) extends Marshal(spec) {
     case r: Record => true
     case e: Enum =>  true
     case p: ProtobufMessage => true
+    case l: Impl => throw new AssertionError("unimplemented")
   }
 
   def isEnumFlags(m: Meta): Boolean = m match {

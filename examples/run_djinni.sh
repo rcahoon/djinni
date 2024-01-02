@@ -68,15 +68,6 @@ fi
     --ident-jni-class NativeFooBar \
     --ident-jni-file NativeFooBar \
     \
-    --objc-out "$temp_out/objc" \
-    --objcpp-out "$temp_out/objc" \
-    --objc-type-prefix TXS \
-    --objc-swift-bridging-header "TextSort-Bridging-Header" \
-    \
-    --wasm-out "$temp_out/wasm" \
-    --ts-out "$temp_out/ts" \
-    --ts-module "example" \
-    \
     --idl "$in"
 
 # Copy changes from "$temp_output" to final dir.
@@ -93,9 +84,9 @@ echo "Copying generated code to final directories..."
 mirror "cpp" "$temp_out/cpp" "$cpp_out"
 mirror "java" "$temp_out/java" "$java_out"
 mirror "jni" "$temp_out/jni" "$jni_out"
-mirror "objc" "$temp_out/objc" "$objc_out"
-mirror "wasm" "$temp_out/wasm" "$wasm_out"
-mirror "ts" "$temp_out/ts" "$ts_out"
+#mirror "objc" "$temp_out/objc" "$objc_out"
+#mirror "wasm" "$temp_out/wasm" "$wasm_out"
+#mirror "ts" "$temp_out/ts" "$ts_out"
 
 date > "$gen_stamp"
 

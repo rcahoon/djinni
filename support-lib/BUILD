@@ -5,7 +5,7 @@ cc_library(
     name = "djinni-support-common",
     srcs = glob(["cpp/*.cpp"]),
     hdrs = glob(["*.hpp", "cpp/*.hpp"]),
-    includes = ["cpp"],
+    includes = ["cpp", "."],
     visibility = ["//visibility:public"],
 )
 

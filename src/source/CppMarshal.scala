@@ -35,6 +35,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
     case e: Enum => idCpp.enumType(name)
     case i: Interface => idCpp.ty(name)
     case r: Record => idCpp.ty(name)
+    case l: Impl => idCpp.ty(name)
     case p: ProtobufMessage => idCpp.ty(name)
   }
 
@@ -43,6 +44,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
     case e: Enum => withNs(Some(spec.cppNamespace), idCpp.enumType(name))
     case i: Interface => withNs(Some(spec.cppNamespace), idCpp.ty(name))
     case r: Record => withNs(Some(spec.cppNamespace), idCpp.ty(name))
+    case l: Impl => withNs(Some(spec.cppNamespace), idCpp.ty(name))
     case p: ProtobufMessage => withNs(Some(p.cpp.ns), idCpp.ty(name))
   }
 
@@ -102,7 +104,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
         } else {
           List()
         }
-      case i: Interface =>
+      case _: Interface | _: Impl =>
         val base = if (d.name != exclude) {
           val typeParams = if (d.numParams == 0) "" else "template " + List.fill(d.numParams)("typename").mkString("<", ", ", ">") + " "
           List(ImportRef("<memory>"), DeclRef(s"${typeParams}class ${typename(d.name, d.body)};", Some(spec.cppNamespace)))
@@ -113,6 +115,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
           case Some(nnHdr) => ImportRef(nnHdr) :: base
           case _ => base
         }
+      //case l: Impl => throw new AssertionError("Impl shouldn't be referenced in other types")
       case p: ProtobufMessage =>
         List(ImportRef(p.cpp.header))
     }
@@ -120,6 +123,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       // Do not forward declare extern types, they might be in arbitrary namespaces.
       // This isn't a problem as extern types cannot cause dependency cycles with types being generated here
       case DInterface => List(ImportRef("<memory>"), ImportRef(e.cpp.header))
+      case DImpl => throw new AssertionError("unreachable")
       case _ => List(ImportRef(resolveExtCppHdr(e.cpp.header)))
     }
     case p: MProtobuf =>
@@ -191,10 +195,10 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
         d.defType match {
           case DEnum => withNamespace(idCpp.enumType(d.name))
           case DRecord => withNamespace(idCpp.ty(d.name)) + args
-          case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}${args}>"
+          case DInterface | DImpl => s"::djinni::SharedPtr<${withNamespace(idCpp.ty(d.name))}${args}>"
         }
       case e: MExtern => e.defType match {
-        case DInterface => s"std::shared_ptr<${e.cpp.typename}${args}>"
+        case DInterface | DImpl => s"::djinni::SharedPtr<${e.cpp.typename}${args}>"
         case _ => e.cpp.typename + args
       }
       case p: MParam => idCpp.typeParam(p.name)
@@ -202,36 +206,11 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       case MVoid => "void"
     }
     def expr(tm: MExpr): String = {
-      spec.cppNnType match {
-        case Some(nnType) => {
-          // if we're using non-nullable pointers for interfaces, then special-case
-          // both optional and non-optional interface types
-          val args = if (tm.args.isEmpty) "" else tm.args.map(expr).mkString("<", ", ", ">")
-          tm.base match {
-            case d: MDef =>
-              d.defType match {
-                case DInterface => s"${nnType}<${withNamespace(idCpp.ty(d.name))}${args}>"
-                case _ => base(tm.base, args)
-              }
-            case MOptional =>
-              tm.args.head.base match {
-                case d: MDef =>
-                  d.defType match {
-                    case DInterface => s"std::shared_ptr<${withNamespace(idCpp.ty(d.name))}${args}>"
-                    case _ => base(tm.base, args)
-                  }
-                case _ => base(tm.base, args)
-              }
-            case _ => base(tm.base, args)
-          }
-        }
-        case None =>
-          val ty = if (isOptionalInterface(tm)) { tm.args.head } else { tm }
-          val prefix = if (!isInterface(ty)) {""} else { /* isInterface */
-            if (isOptional(tm)) {"/*nullable*/ "} else {"/*not-null*/ "}}
-          val args = if (ty.args.isEmpty) "" else ty.args.map(expr).mkString("<", ", ", ">")
-          prefix + base(ty.base, args)
-      }
+      val ty = if (isOptionalInterface(tm)) { tm.args.head } else { tm }
+      val prefix = if (!isInterface(ty)) {""} else { /* isInterface */
+        if (isOptional(tm)) {"/*nullable*/ "} else {"/*not-null*/ "}}
+      val args = if (ty.args.isEmpty) "" else ty.args.map(expr).mkString("<", ", ", ">")
+      prefix + base(ty.base, args)
     }
     expr(tm)
   }
@@ -243,7 +222,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
       case _  => false
     }
     case e: MExtern => e.defType match {
-      case DInterface => false
+      case DInterface | DImpl => false
       case DEnum => true
       case DRecord => e.cpp.byValue
     }
@@ -252,7 +231,7 @@ class CppMarshal(spec: Spec) extends Marshal(spec) {
   }
 
   def byValue(td: TypeDecl): Boolean = td.body match {
-    case i: Interface => false
+    case _: Interface | _: Impl => false
     case r: Record => false
     case e: Enum => true
     case p: ProtobufMessage => false

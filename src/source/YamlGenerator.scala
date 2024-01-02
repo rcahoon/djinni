@@ -133,6 +133,7 @@ class YamlGenerator(spec: Spec) extends Generator(spec) {
       case p: ProtobufMessage => "protobuf"
       case Enum(_, false) => "enum"
       case Enum(_, true) => "flags"
+      case l: Impl => throw new AssertionError("unimplemented")
     }
   }
 
@@ -204,6 +205,7 @@ class YamlGenerator(spec: Spec) extends Generator(spec) {
       case _ =>
         val defType = td.body match {
           case i: Interface => DInterface
+          case l: Impl => DImpl
           case r: Record => DRecord
           case e: Enum => DEnum
           case p: ProtobufMessage => throw new AssertionError("unreachable")
@@ -228,6 +230,10 @@ class YamlGenerator(spec: Spec) extends Generator(spec) {
   }
 
   override def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface) {
+    // unused
+  }
+
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
     // unused
   }
 
@@ -307,5 +313,6 @@ object YamlGenerator {
     case r: Record => DRecord
     case e: Enum => DEnum
     case p: ProtobufMessage => throw new AssertionError("unreachable")
+    case l: Impl => throw new AssertionError("unimplemented")
   }
 }

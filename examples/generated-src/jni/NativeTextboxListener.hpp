@@ -10,8 +10,8 @@ namespace djinni_generated {
 
 class NativeTextboxListener final : ::djinni::JniInterface<::textsort::TextboxListener, NativeTextboxListener> {
 public:
-    using CppType = std::shared_ptr<::textsort::TextboxListener>;
-    using CppOptType = std::shared_ptr<::textsort::TextboxListener>;
+    using CppType = ::djinni::SharedPtr<::textsort::TextboxListener>;
+    using CppOptType = ::djinni::SharedPtr<::textsort::TextboxListener>;
     using JniType = jobject;
 
     using Boxed = NativeTextboxListener;

@@ -357,6 +357,12 @@ abstract class Generator(spec: Spec)
   val idObjc = spec.objcIdentStyle
   val idJs = spec.jsIdentStyle
 
+  protected def implToInterface(l: Impl): Interface = {
+    val ext = Ext(false, true, false, false) // Only C++ implementations for now.
+    val methods = l.methods.map(m => m.interface)
+    return Interface(ext, methods, Seq.empty[Const])
+  }
+
   def wrapNamespace(w: IndentWriter, ns: String, f: IndentWriter => Unit) {
     ns match {
       case "" => f(w)
@@ -423,6 +429,7 @@ abstract class Generator(spec: Spec)
         generateEnum(td.origin, td.ident, td.doc, e)
       case r: Record => generateRecord(td.origin, td.ident, td.doc, td.params, r)
       case i: Interface => generateInterface(td.origin, td.ident, td.doc, td.params, i)
+      case l: Impl => generateImpl(td.origin, td.ident, td.doc, td.params, l)
       case p: ProtobufMessage => // never need to generate files for protobuf types
     }
     generateModule(decls.filter(td => td.body.isInstanceOf[Interface]))
@@ -432,6 +439,7 @@ abstract class Generator(spec: Spec)
   def generateEnum(origin: String, ident: Ident, doc: Doc, e: Enum)
   def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record)
   def generateInterface(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Interface)
+  def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], i: Impl)
 
   // --------------------------------------------------------------------------
   // Render type expression

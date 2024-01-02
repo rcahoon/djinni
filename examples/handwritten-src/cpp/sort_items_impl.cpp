@@ -8,10 +8,6 @@
 
 namespace textsort {
 
-std::shared_ptr<SortItems> SortItems::create_with_listener(const std::shared_ptr<TextboxListener>& listener) {
-    return std::make_shared<SortItemsImpl>(listener);
-}
-
 SortItemsImpl::SortItemsImpl (const std::shared_ptr<TextboxListener> & listener) {
     this->m_listener = listener;
 }
@@ -37,7 +33,7 @@ void SortItemsImpl::sort(sort_order order, const ItemList & items) {
     this->m_listener->update(ItemList(lines));
 }
 
-ItemList SortItems::run_sort(const ItemList & items) {
+ItemList SortItemsImpl::run_sort(const ItemList & items) {
     auto lines = items.items;
     std::sort(lines.begin(), lines.end(), std::less<std::string>());
     return ItemList(lines);

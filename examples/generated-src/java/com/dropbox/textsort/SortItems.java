@@ -13,11 +13,11 @@ import javax.annotation.Nonnull;
     public abstract void sort(@Nonnull SortOrder order, @Nonnull ItemList items);
 
     @CheckForNull
-    public static native SortItems createWithListener(@CheckForNull TextboxListener listener);
+    public static native  SortItems createWithListener(@CheckForNull TextboxListener listener);
 
     /** For the localhost / command-line demo */
     @Nonnull
-    public static native ItemList runSort(@Nonnull ItemList items);
+    public static native  ItemList runSort(@Nonnull ItemList items);
 
     public static final class CppProxy extends SortItems
     {

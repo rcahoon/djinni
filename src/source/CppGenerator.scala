@@ -373,9 +373,92 @@ class CppGenerator(spec: Spec) extends Generator(spec) {
 
   }
 
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    val methods = (l.methods ++ l.interface.fold(Seq.empty[Impl.Method])(ty => {
+      val i: Interface = ty.resolved.base.asInstanceOf[MDef].body.asInstanceOf[Interface]
+      val intfMethods = i.methods.filterNot(m => l.methods.exists(ml => ml.interface == m))
+      intfMethods.map(m => Impl.Method(m, ReturnValuePolicy.Automatic, Seq.empty[KeepAlive], /* code */ Option.empty[String]))
+    })).map(_ match {
+      case Impl.Method(interface, returnValuePolicy, keepAlive, None) =>
+        val args = interface.params.map(p => idCpp.local(p.ident)).mkString("(", ", ", ")")
+        val objRef = if (interface.static) l.nativeDelegate.typeName + "::" else "self->"
+        val nativeTrampoline = s"return ${objRef}${idCpp.method(interface.ident)}${args};"
+        Impl.Method(interface, returnValuePolicy, keepAlive, Some(nativeTrampoline))
+      case m @ Impl.Method(_, _, _, Some(_)) => m
+    })
+
+    val refs = new CppRefs(ident.name)
+    refs.cpp.add("""#include "djinni_function_policies.hpp"""")
+    refs.hpp.add("""#include "djinni_common.hpp"""")
+    methods.map(m => {
+      m.interface.params.map(p => refs.find(p.ty, true))
+      m.interface.ret.foreach((x) => refs.find(x, true))
+    })
+    refs.hpp.add(s"""#include "${l.nativeDelegate.fileName}"""")
+
+    val boundType = marshal.typename(ident, l)
+    //FIXME: Add a method to `CppMarshal` that canonically produces the name of the
+    // binding class (correctly handling the addition of namespaces).
+    val self = marshal.typename(ident, l) + "_djinni_binding"
+    val methodNamesInScope = methods.map(m => idCpp.method(m.interface.ident))
+
+    writeHppFile(ident, origin, refs.hpp, refs.hppFwds, w => {
+      w.wl(s"using ${boundType} = ${l.nativeDelegate.typeName};")
+      w.wl
+      writeDoc(w, doc)
+      writeCppTypeParams(w, typeParams)
+      w.w(s"class $self").bracedSemi {
+        w.wlOutdent("public:")
+        // Methods
+        for (ml: Impl.Method <- methods) {
+          val m = ml.interface
+          w.wl
+          writeMethodDoc(w, m, idCpp.local)
+          val ret = marshal.returnType(m.ret, methodNamesInScope)
+          val constFlag = if (m.const) "const " else ""
+          val selfParam = if (m.static) None else Some(s"::djinni::SharedPtr<$constFlag${l.nativeDelegate.typeName}> self")
+          val params = selfParam ++ m.params.map(p => marshal.paramType(p.ty, methodNamesInScope) + " " + idCpp.local(p.ident))
+          w.wl(s"static $ret ${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")};")
+        }
+      }
+    })
+
+    writeCppFile(ident, origin, refs.cpp, w => {
+      // Methods
+      for (ml: Impl.Method <- methods) {
+        val m = ml.interface
+        w.wl
+        val ret = marshal.returnType(m.ret, methodNamesInScope)
+        val constFlag = if (m.const) "const " else ""
+        val selfParam = if (m.static) None else Some(s"::djinni::SharedPtr<$constFlag${l.nativeDelegate.typeName}> self")
+        val params = selfParam ++ m.params.map(p => marshal.paramType(p.ty, methodNamesInScope) + " " + idCpp.local(p.ident))
+        val returnValuePolicy = if (ret == "void") "Void" else ml.returnValuePolicy;
+        writeCppTypeParams(w, typeParams)
+        w.w(s"$ret $self${cppTypeArgs(typeParams)}::${idCpp.method(m.ident)}${params.mkString("(", ", ", ")")}").braced {
+          w.wl(s"auto _djinni_result = ::djinni::return_value_policy::$returnValuePolicy<$ret>([&]() -> decltype(auto)").bracedEnd(");") {
+            w.wl(ml.code.get)
+          }
+          if (ml.keepAlive.nonEmpty) {
+            val args = Seq("_djinni_result") ++ (if (m.static) None else Some("self")) ++ m.params.map(p => idCpp.local(p.ident))
+            w.wl(s"auto _djinni_args = std::tie${args.mkString("(", ", ", ")")});")
+            for (ka: KeepAlive <- ml.keepAlive) {
+              w.wl(s"::djinni::keepAlive<${ka.nurse}, ${ka.patient}>(_djinni_args)")
+            }
+          }
+          w.wl(s"return static_cast<$ret>(_djinni_result);")
+        }
+      }
+    })
+
+  }
+
   def writeCppTypeParams(w: IndentWriter, params: Seq[TypeParam]) {
     if (params.isEmpty) return
     w.wl("template " + params.map(p => "typename " + idCpp.typeParam(p.ident)).mkString("<", ", ", ">"))
+  }
+
+  def cppTypeArgs(params: Seq[TypeParam]) = {
+    if (params.isEmpty) "" else params.map(p => idCpp.typeParam(p.ident)).mkString("<", ", ", ">")
   }
 
 }

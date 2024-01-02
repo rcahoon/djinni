@@ -92,6 +92,7 @@ abstract sealed class DefType
 case object DEnum extends DefType
 case object DInterface extends DefType
 case object DRecord extends DefType
+case object DImpl extends DefType
 
 case class MPrimitive(_idlName: String, jName: String, jniName: String, cName: String, jBoxed: String, jSig: String, objcName: String, objcBoxed: String) extends MOpaque { val numParams = 0; val idlName = _idlName }
 case object MString extends MOpaque { val numParams = 0; val idlName = "string" }
@@ -124,7 +125,7 @@ val defaults: Map[String,MOpaque] = immutable.HashMap(
 
 def isInterface(ty: MExpr): Boolean = {
   ty.base match {
-    case d: MDef => d.defType == DInterface
+    case d: MDef => d.defType == DInterface || d.defType == DImpl
     case e: MExtern => e.defType == DInterface
     case _ => false
   }

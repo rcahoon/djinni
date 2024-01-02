@@ -49,11 +49,13 @@ class ObjcMarshal(spec: Spec) extends Marshal(spec) {
         case DEnum => None
         case DInterface => interfaceNullity
         case DRecord => nonnull
+        case DImpl => throw new AssertionError("unimplemented")
       }
       case e: MExtern => e.defType match {
         case DEnum => None
         case DInterface => interfaceNullity
         case DRecord => if(e.objc.pointer) nonnull else None
+        case DImpl => throw new AssertionError("unimplemented")
       }
       case MProtobuf(_, _, ProtobufMessage(_, _, None, _)) => None
       case _ => nonnull
@@ -102,6 +104,7 @@ class ObjcMarshal(spec: Spec) extends Marshal(spec) {
         val r = d.body.asInstanceOf[Record]
         val prefix = if (r.ext.objc) spec.objcExtendedRecordIncludePrefix else spec.objcIncludePrefix
         List(ImportRef(q(prefix + headerName(d.name))))
+      case DImpl => throw new AssertionError("unimplemented")
     }
     case e: MExtern => List(ImportRef(resolveExtObjcHdr(e.objc.header)))
     case p: MProtobuf => p.body.objc match {
@@ -124,6 +127,7 @@ class ObjcMarshal(spec: Spec) extends Marshal(spec) {
     case r: Record => true
     case e: Enum => false
     case p: ProtobufMessage => true
+    case l: Impl => throw new AssertionError("unimplemented")
   }
 
   def boxedTypename(td: TypeDecl) = td.body match {
@@ -131,6 +135,7 @@ class ObjcMarshal(spec: Spec) extends Marshal(spec) {
     case r: Record => typename(td.ident, r)
     case e: Enum => "NSNumber"
     case p: ProtobufMessage => typename(td.ident, p)
+    case l: Impl => throw new AssertionError("unimplemented")
   }
 
   // Return value: (Type_Name, Is_Class_Or_Not)
@@ -168,6 +173,7 @@ class ObjcMarshal(spec: Spec) extends Marshal(spec) {
                   (idObjc.ty(d.name), true)
                 else
                   (s"id<${idObjc.ty(d.name)}>", false)
+              case DImpl => throw new AssertionError("unimplemented")
             }
             case e: MExtern => e.body match {
               case i: Interface =>

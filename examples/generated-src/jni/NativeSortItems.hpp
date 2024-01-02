@@ -10,8 +10,8 @@ namespace djinni_generated {
 
 class NativeSortItems final : ::djinni::JniInterface<::textsort::SortItems, NativeSortItems> {
 public:
-    using CppType = std::shared_ptr<::textsort::SortItems>;
-    using CppOptType = std::shared_ptr<::textsort::SortItems>;
+    using CppType = ::djinni::SharedPtr<::textsort::SortItems>;
+    using CppOptType = ::djinni::SharedPtr<::textsort::SortItems>;
     using JniType = jobject;
 
     using Boxed = NativeSortItems;

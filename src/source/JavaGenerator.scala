@@ -252,6 +252,12 @@ class JavaGenerator(spec: Spec) extends Generator(spec) {
     })
   }
 
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    if (l.interface.isEmpty) {
+      generateInterface(origin, ident, doc, typeParams, implToInterface(l))
+    }
+  }
+
   override def generateRecord(origin: String, ident: Ident, doc: Doc, params: Seq[TypeParam], r: Record) {
     val refs = new JavaRefs()
     r.fields.foreach(f => refs.find(f.ty))

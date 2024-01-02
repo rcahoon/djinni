@@ -302,7 +302,7 @@ namespace djinni
         // SFINAE helper: if C::CppOptType exists, opt_type<T>(nullptr) will return
         // that type. If not, it returns OptionalType<C::CppType>. This is necessary
         // because we special-case optional interfaces to be represented as a nullable
-        // std::shared_ptr<T>, not optional<shared_ptr<T>> or optional<nn<shared_ptr<T>>>.
+        // shared_ptr<T>, not optional<shared_ptr<T>> or optional<nn<shared_ptr<T>>>.
         template <typename C> static OptionalType<typename C::CppType> opt_type(...);
         template <typename C> static typename C::CppOptType opt_type(typename C::CppOptType *);
         using CppType = decltype(opt_type<T>(nullptr));

@@ -88,6 +88,28 @@ object Interface {
   case class Method(ident: Ident, params: Seq[Field], ret: Option[TypeRef], doc: Doc, static: Boolean, const: Boolean, lang: Ext)
 }
 
+case class Impl(interface: Option[TypeRef], nativeDelegate: NativeTypeRef, methods: Seq[Impl.Method]) extends TypeDef
+object Impl {
+  case class Method(interface: Interface.Method, returnValuePolicy: ReturnValuePolicy, keepAlive: Seq[KeepAlive], code: Option[String])
+}
+
+case class NativeTypeRef(typeName: String, fileName: String)
+object NativeTypeRef {
+  val EmptyType = NativeTypeRef("::djinni::Empty", "Empty.hpp")
+}
+
+case class KeepAlive(nurse: Long, patient: Long)
+
+sealed trait ReturnValuePolicy
+object ReturnValuePolicy {
+  case object Automatic extends ReturnValuePolicy
+  case object Take extends ReturnValuePolicy
+  case object Copy extends ReturnValuePolicy
+  case object Move extends ReturnValuePolicy
+  case object Disconnect extends ReturnValuePolicy
+  case object Discard extends ReturnValuePolicy
+}
+
 case class Field(ident: Ident, ty: TypeRef, doc: Doc)
 
 case class ProtobufMessage(cpp: ProtobufMessage.Cpp, java: ProtobufMessage.Java, objc: Option[ProtobufMessage.Objc], ts: Option[ProtobufMessage.Ts]) extends TypeDef

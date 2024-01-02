@@ -468,7 +468,7 @@ struct CppProxyCacheEntry {
 };
 
 extern JsProxyId nextId;
-extern std::unordered_map<JsProxyId, std::weak_ptr<JsProxyBase>> jsProxyCache;
+extern std::unordered_map<JsProxyId, djinni::WeakPtr<JsProxyBase>> jsProxyCache;
 extern std::unordered_map<void*, CppProxyCacheEntry> cppProxyCache;
 extern std::mutex jsProxyCacheMutex;
 extern std::mutex cppProxyCacheMutex;
@@ -477,7 +477,7 @@ void checkForNull(void* ptr, const char* context);
 
 template<typename I, typename Self>
 struct JsInterface {
-    static void nativeDestroy(const std::shared_ptr<I>& cpp) {
+    static void nativeDestroy(const ::djinni::SharedPtr<I>& cpp) {
         std::lock_guard lk(cppProxyCacheMutex);
         auto i = cppProxyCache.find(cpp.get());
         assert(i != cppProxyCache.end());
@@ -489,14 +489,14 @@ struct JsInterface {
     // (interface +c)
     template <typename, typename>
     struct GetOrCreateCppProxy {
-        em::val operator() (const std::shared_ptr<I>& c) {
+        em::val operator() (const ::djinni::SharedPtr<I>& c) {
             assert(false && "Attempting to pass C++ object but interface lacks +c");
             return em::val::undefined();
         }
     };
     template <typename T>
     struct GetOrCreateCppProxy<T, std::void_t<decltype(T::cppProxyMethods)>> {
-        em::val operator() (const std::shared_ptr<I>& c) {
+        em::val operator() (const ::djinni::SharedPtr<I>& c) {
             // look up in cpp proxy cache
             std::lock_guard lk(cppProxyCacheMutex);
             auto i = cppProxyCache.find(c.get());
@@ -525,7 +525,7 @@ struct JsInterface {
             return cppProxy;
         }
     };
-    static em::val _toJs(const std::shared_ptr<I>& c) {
+    static em::val _toJs(const ::djinni::SharedPtr<I>& c) {
         if (c == nullptr) {
             // null object
             return em::val::undefined();
@@ -541,14 +541,14 @@ struct JsInterface {
     // (interface +w)
     template <typename, typename>
     struct GetOrCreateJsProxy {
-        std::shared_ptr<I> operator() (em::val js) {
+        ::djinni::SharedPtr<I> operator() (em::val js) {
             assert(false && "Attempting to pass JS object but interface lacks +w");
             return {};
         }
     };
     template <typename T>
     struct GetOrCreateJsProxy<T, std::void_t<typename T::JsProxy>> {
-        std::shared_ptr<I> operator() (em::val js) {
+        ::djinni::SharedPtr<I> operator() (em::val js) {
             std::lock_guard lk(jsProxyCacheMutex);
             // check prsence of proxy id in js object
             JsProxyId id;
@@ -570,13 +570,13 @@ struct JsInterface {
             }
             // not found or cache entry expired
             // create new js proxy and store it in cache
-            auto newJsProxy = std::make_shared<typename Self::JsProxy>(js);
+            auto newJsProxy = djinni::makeShared<typename Self::JsProxy>(js);
             jsProxyCache.emplace(id, newJsProxy);
             return newJsProxy;
         }
     };
 
-    static std::shared_ptr<I> _fromJs(em::val js) {
+    static ::djinni::SharedPtr<I> _fromJs(em::val js) {
         static const em::val nativeRef("_djinni_native_ref");
         // null object
         if (js.isUndefined() || js.isNull()) {
@@ -584,7 +584,7 @@ struct JsInterface {
         }
         else if (nativeRef.in(js)) {
             // existing cpp proxy
-            return js[nativeRef].as<std::shared_ptr<I>>();
+            return js[nativeRef].as<::djinni::SharedPtr>();
         } else {
             return GetOrCreateJsProxy<Self, void>()(js);
         }

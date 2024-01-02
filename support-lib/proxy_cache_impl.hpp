@@ -123,7 +123,7 @@ public:
         // mutex scope so that in case we are left with the last reference to
         // the new proxy object, the destruction will happen outside of the
         // mutex
-        OwningProxyPointer temp_ptr_holder;
+        OwningProxyPointer temp_ptr_holder [[maybe_unused]];
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             auto it = m_mapping.find({tag, impl_unowning});

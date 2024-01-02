@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "djinni_common.hpp"
+#include "sort_items_impl.hpp"
 #include <memory>
 
 namespace textsort {
@@ -11,14 +13,15 @@ class TextboxListener;
 enum class sort_order;
 struct ItemList;
 
-class SortItems {
+using SortItems = textsort::SortItemsImpl;
+
+class SortItems_djinni_binding {
 public:
-    virtual ~SortItems() = default;
 
     /** For the iOS / Android demo */
-    virtual void sort(sort_order order, const ItemList & items) = 0;
+    static void sort(::djinni::SharedPtr<textsort::SortItemsImpl> self, sort_order order, const ItemList & items);
 
-    static /*not-null*/ std::shared_ptr<SortItems> create_with_listener(const /*not-null*/ std::shared_ptr<TextboxListener> & listener);
+    static /*not-null*/ ::djinni::SharedPtr<SortItems> create_with_listener(const /*not-null*/ ::djinni::SharedPtr<TextboxListener> & listener);
 
     /** For the localhost / command-line demo */
     static ItemList run_sort(const ItemList & items);

@@ -56,7 +56,7 @@ class ObjcppMarshal(spec: Spec) extends Marshal(spec) {
       case None => List(ImportRef(q(spec.objcBaseLibIncludePrefix + "DJIMarshal+Private.h")))
     }
     case d: MDef => d.defType match {
-      case DEnum | DInterface =>
+      case DEnum | DInterface | DImpl =>
         List(ImportRef(include(m)))
       case DRecord =>
         val r = d.body.asInstanceOf[Record]

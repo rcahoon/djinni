@@ -28,8 +28,8 @@ struct unretained_id_hash { std::size_t operator()(__unsafe_unretained id ptr) c
 struct ObjcProxyCacheTraits {
     using UnowningImplPointer = __unsafe_unretained id;
     using OwningImplPointer = __strong id;
-    using OwningProxyPointer = std::shared_ptr<void>;
-    using WeakProxyPointer = std::weak_ptr<void>;
+    using OwningProxyPointer = ::djinni::SharedPtr<void>;
+    using WeakProxyPointer = ::djinni::WeakPtr<void>;
     using UnowningImplPointerHash = unretained_id_hash;
     using UnowningImplPointerEqual = std::equal_to<__unsafe_unretained id>;
 };
@@ -40,13 +40,13 @@ extern template class ProxyCache<ObjcProxyCacheTraits>;
 using ObjcProxyCache = ProxyCache<ObjcProxyCacheTraits>;
 
 template <typename CppType, typename ObjcType>
-static std::shared_ptr<CppType> get_objc_proxy(ObjcType * objcRef) {
-    return std::static_pointer_cast<CppType>(ObjcProxyCache::get(
+static ::djinni::SharedPtr<CppType> get_objc_proxy(ObjcType * objcRef) {
+    return static_pointer_cast<CppType>(ObjcProxyCache::get(
         typeid(objcRef),
         objcRef,
-        [] (const __strong id & objcRef) -> std::pair<std::shared_ptr<void>, __unsafe_unretained id> {
+        [] (const __strong id & objcRef) -> std::pair<::djinni::SharedPtr<void>, __unsafe_unretained id> {
             return {
-                std::make_shared<CppType>(objcRef),
+                djinni::makeShared<CppType>(objcRef),
                 objcRef
             };
         }

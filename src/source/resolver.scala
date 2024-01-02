@@ -52,6 +52,7 @@ def resolve(metas: Scope, idl: Seq[TypeDecl]): Option[Error] = {
           DEnum
         case r: Record => DRecord
         case i: Interface => DInterface
+        case l: Impl => DImpl
         case p: ProtobufMessage => throw new AssertionError("unreachable")
       }
       topScope = topScope.updated(typeDecl.ident.name, typeDecl match {
@@ -93,6 +94,7 @@ private def resolve(scope: Scope, typeDef: TypeDef) {
     case e: Enum => resolveEnum(scope, e)
     case r: Record => resolveRecord(scope, r)
     case i: Interface => resolveInterface(scope, i)
+    case l: Impl => resolveImpl(scope, l)
     case p: ProtobufMessage=>
   }
 }
@@ -121,6 +123,7 @@ private def resolveConst(typeDef: TypeDef) {
     case e: Enum =>
     case r: Record => f(r.consts)
     case i: Interface => f(i.consts)
+    case l: Impl =>
     case p: ProtobufMessage=>
   }
 }
@@ -180,7 +183,7 @@ private def constTypeCheck(ty: MExpr, value: Any, resolvedConsts: Seq[Const]) {
       }
     }
     case d: MDef => d.defType match {
-      case DInterface =>
+      case DInterface | DImpl =>
         throw new AssertionError("Type not allowed for constant")
       case DRecord =>
         if (!value.isInstanceOf[Map[_, _]])
@@ -244,6 +247,8 @@ private def resolveRecord(scope: Scope, r: Record) {
       case df: MDef => df.defType match {
         case DInterface =>
           throw new Error(f.ident.loc, "Interface reference cannot live in a record").toException
+        case DImpl =>
+          throw new Error(f.ident.loc, "Impl reference cannot live in a record").toException
         case DRecord =>
           val record = df.body.asInstanceOf[Record]
           if (!r.derivingTypes.subsetOf(record.derivingTypes))
@@ -253,6 +258,8 @@ private def resolveRecord(scope: Scope, r: Record) {
       case e: MExtern => e.defType match {
         case DInterface =>
           throw new Error(f.ident.loc, "Interface reference cannot live in a record").toException
+        case DImpl =>
+          throw new Error(f.ident.loc, "Impl reference cannot live in a record").toException
         case DRecord =>
           val record = e.body.asInstanceOf[Record]
           if (!r.derivingTypes.subsetOf(record.derivingTypes))
@@ -271,38 +278,73 @@ private def resolveRecord(scope: Scope, r: Record) {
 }
 
 private def resolveInterface(scope: Scope, i: Interface) {
-  // Const and static methods are only allowed on +c (only) interfaces
-  if (i.ext.java || i.ext.objc) {
-    for (m <- i.methods) {
-      if (m.static)
-        throw Error(m.ident.loc, "static not allowed for +j or +o interfaces").toException
-      if (m.const)
-        throw Error(m.ident.loc, "const method not allowed for +j or +o +p interfaces").toException
-    }
-  }
-
-  // Static+const isn't valid
-  if (i.ext.cpp) {
-    for (m <- i.methods) {
-      if (m.static && m.const)
-        throw Error(m.ident.loc, "+c method cannot be both static and const").toException
-    }
-  }
   val dupeChecker = new DupeChecker("method")
   for (m <- i.methods) {
     dupeChecker.check(m.ident)
-    for (p <- m.params) {
-      resolveRef(scope, p.ty)
-    }
-    m.ret match {
-      case Some(ty) => resolveRef(scope, ty)
-      case _ =>
-    }
+    resolveMethod(scope, m, i.ext)
   }
   // Name checking for constants. Type check only possible after resolving record field types.
   for (c <- i.consts) {
     dupeChecker.check(c.ident)
     resolveRef(scope, c.ty)
+  }
+}
+
+private def resolveMethod(scope: Scope, m: Interface.Method, ext: Ext) {
+  // Const and static methods are only allowed on +c (only) interfaces
+  if (ext.java || ext.objc) {
+    if (m.static)
+      throw Error(m.ident.loc, "static not allowed for +j or +o interfaces").toException
+    if (m.const)
+      throw Error(m.ident.loc, "const method not allowed for +j or +o +p interfaces").toException
+  }
+
+  // Static+const isn't valid
+  if (ext.cpp) {
+    if (m.static && m.const)
+      throw Error(m.ident.loc, "+c method cannot be both static and const").toException
+  }
+
+  for (p <- m.params) {
+    resolveRef(scope, p.ty)
+  }
+  m.ret match {
+    case Some(ty) => resolveRef(scope, ty)
+    case _ =>
+  }
+}
+
+private def resolveImpl(scope: Scope, l: Impl) {
+  // NOTE: These conditions all asssume we're in C++. See resolveInterface for ideas about how to
+  // accommodate multiple languages.
+
+  val dupeChecker = new DupeChecker("method")
+  val ext = Ext(false, true, false, false) // Only C++ implementations for now.
+  for (m <- l.methods) {
+    dupeChecker.check(m.interface.ident)
+    resolveMethod(scope, m.interface, ext)
+  }
+
+  l.interface match {
+    case Some(ty) => {
+      resolveRef(scope, ty)
+      ty.resolved.base match {
+        case d: MDef => d.body match {
+          case i: Interface => 
+            if (!i.ext.cpp) {
+              throw Error(ty.expr.ident.loc, "Interface does not support C++ implementations. Add +c").toException
+            }
+            for (m <- l.methods) {
+              /*if (!i.methods.contains(m.interface)) {
+                throw Error(m.interface.ident.loc, "Impl method does not exist in the interface").toException
+              }*/
+            }
+          case _ => throw Error(ty.expr.ident.loc, "Not an interface").toException
+        }
+        case _ => throw Error(ty.expr.ident.loc, "Not an interface").toException
+      }
+    }
+    case None =>
   }
 }
 

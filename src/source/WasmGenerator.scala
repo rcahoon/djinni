@@ -287,8 +287,8 @@ class WasmGenerator(spec: Spec) extends Generator(spec) {
     writeHppFileGeneric(spec.wasmOutFolder.get, helperNamespace(), wasmFilenameStyle)(ident.name, origin, refs.hpp, Nil, (w => {
       w.w(s"struct $helper : ::djinni::JsInterface<$cls, $helper>").bracedSemi {
         // types
-        w.wl(s"using CppType = std::shared_ptr<$cls>;")
-        w.wl(s"using CppOptType = std::shared_ptr<$cls>;")
+        w.wl(s"using CppType = ::djinni::SharedPtr<$cls>;")
+        w.wl(s"using CppOptType = ::djinni::SharedPtr<$cls>;")
         w.wl("using JsType = em::val;")
         w.wl(s"using Boxed = $helper;")
         w.wl
@@ -422,7 +422,7 @@ class WasmGenerator(spec: Spec) extends Generator(spec) {
         }
 
         w.wl(classRegister).nested {
-          w.wl(s""".smart_ptr<std::shared_ptr<$cls>>("${fullyQualifiedJsName}")""")
+          w.wl(s""".smart_ptr<::djinni::SharedPtr<$cls>>("${fullyQualifiedJsName}")""")
           w.wl(s""".function("${idJs.method("native_destroy")}", &$helper::nativeDestroy)""")
           if (i.ext.cpp) {
             for (m <- i.methods.filter(m => !m.static || m.lang.js)) {
@@ -438,6 +438,12 @@ class WasmGenerator(spec: Spec) extends Generator(spec) {
         generateWasmConstants(w, ident, i.consts);
       }
     }))
+  }
+
+  override def generateImpl(origin: String, ident: Ident, doc: Doc, typeParams: Seq[TypeParam], l: Impl) {
+    if (l.interface.isEmpty) {
+      generateInterface(origin, ident, doc, typeParams, implToInterface(l))
+    }
   }
 
   def withWasmNamespace(name: String, sep: String = "_") = spec.wasmNamespace match {
